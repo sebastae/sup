@@ -776,25 +776,27 @@ EOS
       .take_while{|d| [:text_color, :sig_color].include?(d[0]) and d[1].strip != ""} # Only take up to the first "" alone on its line
       .map{|d| d[1].strip}.join("").strip
 
-    found = false
-    URI.extract(linetext || "").each do |match|
+    
+    uris = URI.extract(linetext || "").map do |match|
       begin
         u = URI.parse(match)
         next unless u.absolute?
-        next unless ["http", "https"].include?(u.scheme)
+        next unless ["http", "https"].include(u.scheme?)
 
-        reallink = Shellwords.escape(u.to_s)
-        BufferManager.flash "Going to #{reallink} ..."
-        HookManager.run "goto", :uri => reallink
-        BufferManager.completely_redraw_screen
-        found = true
-
+        Shellwords.escape(u.to_s)
       rescue URI::InvalidURIError => e
-        debug "not a uri: #{e}"
-        # Do nothing, this is an ok flow
+        debug "not a valid URI: #{e}"
       end
     end
-    BufferManager.flash "No URI found." unless found
+
+    # Remove nils from skipped matches
+    uris = uris.compact
+    if uris.length > 0
+      HookManager.run "goto", :uris => uris
+      BufferManager.completely_redraw_screen
+    else
+      BufferManager.flash "No URI found."
+    end
   end
 
   def fetch_and_verify
